@@ -9,16 +9,17 @@ using namespace Eigen;
 using namespace std;
 int main()
 {
-  // TODO: extend for multiple channel inputs
-
+  // TODO: extend for multiple channel inputs -> would need Tensor instead of Matrix object
+  
+  const int num_rows = 5;
+  const int num_cols = 5;
   // generate random input matrix of integers 
   // output of convolutional layer (assuming batch norm after conv and before activation)
-  // TODO: set matrix size in flexible manner
-  // TODO: randomization to constants
-  MatrixXd m = MatrixXd::Random(3,3);
-  m = (m + MatrixXd::Constant(3,3,1.0)) * 50;
-  MatrixXi src = m.cast <int> ();
-  cout << "src =" << endl << src << endl;
+
+  MatrixXd rand_floats = MatrixXd::Random(num_rows,num_cols);
+  rand_floats = (rand_floats + MatrixXd::Constant(num_rows,num_cols,1.0)) * 50;
+  MatrixXi target = rand_floats.cast <int> ();
+  cout << "target matrix =" << endl << target << endl;
   
   mt19937 rng;
   rng.seed(random_device()());
@@ -34,6 +35,9 @@ int main()
   cout << "beta =" << endl << beta << endl;
 
   // init running mean randomly
+  float float_mean = target.mean();
+  int running_mean = <int> float_mean;
 
   // init variance randomly
+  
 }
