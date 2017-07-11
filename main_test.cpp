@@ -36,7 +36,7 @@ int main()
 
   // init running mean randomly
   float float_mean = target.mean();
-  int running_mean = <int> float_mean;
+  int running_mean = (int)float_mean;
 
   // init variance randomly
   
