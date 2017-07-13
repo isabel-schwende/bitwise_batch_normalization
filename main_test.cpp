@@ -8,14 +8,15 @@
 using namespace Eigen;
 using namespace std;
 
+template<typename ParamT,typename Derived>
 void batch_normalize_conv_inference (
-	const float eps,
-        MatrixXf& dest,
-        const MatrixXf& target,
-        const float gamma, 
-        const float beta,
-        const float running_mean,
-        const float running_variance
+	const ParamT eps,
+        MatrixBase<Derived>& dest,
+        const MatrixBase<Derived>& target,
+        const ParamT gamma, 
+        const ParamT beta,
+        const ParamT running_mean,
+        const ParamT running_variance
 )
 {
   
@@ -30,31 +31,35 @@ void batch_normalize_conv_inference (
   cout << "destination matrix =" << endl << dest << endl;
 }
 
-void batch_normalize_conv_inference (
-	const int eps,
-        MatrixXi& dest,
-        const MatrixXi& target,
-        const int gamma, 
-        const int beta,
-        const int running_mean,
-        const int running_variance
+
+template<typename ParamT,typename Derived>
+void bitwise_batch_normalize_inference (
+	const ParamT eps,
+        MatrixBase<Derived>& dest,
+        const MatrixBase<Derived>& target,
+        const ParamT gamma, 
+        const ParamT beta,
+        const ParamT running_mean,
+        const ParamT running_variance
 )
 {
   
-  const float invstd = 1.0f/std::sqrt(running_variance + eps);
   for (int i = 0; i < target.rows(); i++)
   	{
   	for (int j = 0; j < target.cols(); j++)
         	{
-                dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
+		
+		
+                //dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
-  cout << "destination matrix =" << endl << dest << endl;
+  //cout << "destination matrix =" << endl << dest << endl;
 }
 
-float get_variance_of_matrix (
-	const MatrixXi& target,
-        const int mean
+template<typename ParamT,typename Derived>
+ParamT get_variance_of_matrix (
+	const MatrixBase<Derived>& target,
+        const ParamT mean
 )
 {
   float var = 0;
