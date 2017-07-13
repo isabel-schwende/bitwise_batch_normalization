@@ -1,20 +1,21 @@
 #include <iostream>
 #include <Eigen/Dense>
 #include <random>
-// copied the Eigen folder to /usr/local/include/ or put symlink
+#include <bitset>
+// copy the Eigen folder to /usr/local/include/ or put symlink
 
 // run this program as
 // g++ main_test.cpp -std=c++11 -o test
 using namespace Eigen;
 using namespace std;
 
-template<typename ParamT,typename Derived>
+template<typename ParamT,typename ParamU,typename Derived>
 void batch_normalize_conv_inference (
 	const ParamT eps,
         MatrixBase<Derived>& dest,
         const MatrixBase<Derived>& target,
-        const ParamT gamma, 
-        const ParamT beta,
+        const ParamU gamma, 
+        const ParamU beta,
         const ParamT running_mean,
         const ParamT running_variance
 )
@@ -28,27 +29,49 @@ void batch_normalize_conv_inference (
                 dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
-  cout << "destination matrix =" << endl << dest << endl;
+  //cout << "destination matrix =" << endl << dest << endl;
 }
 
-
-template<typename ParamT,typename Derived>
+// the function is using int as type but it could be an 8-bit type as well 
+// int just worked better with the Eigen matrix type
+// TODO: maybe the datatype could be changed to the uint8_t type in the future
 void bitwise_batch_normalize_inference (
-	const ParamT eps,
-        MatrixBase<Derived>& dest,
-        const MatrixBase<Derived>& target,
-        const ParamT gamma, 
-        const ParamT beta,
-        const ParamT running_mean,
-        const ParamT running_variance
+	const unsigned int eps,
+        MatrixXi& dest,
+        const MatrixXi& target,
+        const unsigned int gamma, 
+        const unsigned int beta,
+        const unsigned int running_mean,
+        const unsigned int running_variance
 )
 {
-  
+  // ### compute square root ###
+  // find leading bit of variance
+  cout << "var: "<< running_variance << endl;
+  bitset<16> bit_var{running_variance};
+  cout << "bit var: "<< bit_var << endl;
+  // clz computes the number of running zeros regarding a 32-bit encoding
+  unsigned int pos_highest_bit = 32 - __builtin_clz(running_variance);
+  //cout << "clz: "<< __builtin_clz(running_variance) << endl;
+  //cout << "position of highest bit: "<< pos_highest_bit << endl;
+  // shift number of to the right by one bit (means dividing by 2)
+  bitset<16> highest_bit{pos_highest_bit};
+  highest_bit >>= 1;
+  //cout << "highest bit: "<< highest_bit << endl;
+  unsigned int sqrt_shift = (unsigned int)(highest_bit.to_ulong());
+  // shift variance
+  bit_var >>= sqrt_shift;
+  cout << "shifted bit var: "<< bit_var << endl;  
+  unsigned int sqrt_approx = (unsigned int)(bit_var.to_ulong());
+  cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
+
   for (int i = 0; i < target.rows(); i++)
   	{
   	for (int j = 0; j < target.cols(); j++)
         	{
-		
+  		// ### center inputs by subtracting the mean ###
+		dest(i,j) = target(i,j) - running_mean;
+
 		
                 //dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
@@ -142,13 +165,18 @@ int main()
 
   // gamma has to be a power of 2 
   // in this case we'll just generate the power of two as an integer without computing it yet
-  int gamma_rnd = dist8(rng);
+  unsigned int gamma_rnd = dist8(rng);
   // can be any integer
-  int beta_rnd =  dist_beta(rng);
+  unsigned int beta_rnd =  dist_beta(rng);
   cout << "gamma =" << endl << gamma_rnd << endl;
   cout << "beta =" << endl << beta_rnd << endl;
 
 
   // call int batch norm with random shift and scale
   batch_normalize_conv_inference ((int)eps,output,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
+
+ //#### Test bitwise batch normalization (with scaling and shifting)####
+
+  // call bitwise batch norm with random shift and scale
+  bitwise_batch_normalize_inference ((unsigned int)eps,output,target,gamma_rnd, beta_rnd,(unsigned int)running_mean,(unsigned int)running_var);
 }
