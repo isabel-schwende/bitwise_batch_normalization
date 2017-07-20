@@ -60,19 +60,44 @@ void bitwise_batch_normalize_inference (
   //cout << "highest bit: "<< highest_bit << endl;
   unsigned int sqrt_shift = (unsigned int)(highest_bit.to_ulong());
   // shift variance
-  bit_var >>= sqrt_shift;
-  cout << "shifted bit var: "<< bit_var << endl;  
-  unsigned int sqrt_approx = (unsigned int)(bit_var.to_ulong());
+  bitset<16> bit_std;
+  bit_std = bit_var >> sqrt_shift;
+  
+    
+  unsigned int sqrt_approx = (unsigned int)(bit_std.to_ulong());
   cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
+  // Adding 1 to the std - likely to have little effect on the result but prevents division by zero
+  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+1);
+  cout << "power of 2 standard deviation: "<< pow_2_std << endl;  
 
   for (int i = 0; i < target.rows(); i++)
   	{
   	for (int j = 0; j < target.cols(); j++)
         	{
   		// ### center inputs by subtracting the mean ###
-		dest(i,j) = target(i,j) - running_mean;
-
+		int centered_value = target(i,j) - running_mean;
+		// shift to the right to divide by the standard deviation with added const
+		bitset<16> bit_value{centered_value};
+		cout << "centered input bits: "<< bit_value << endl;
 		
+		// equivalent in formula: (target(i,j) - running_mean)*invstd
+		bit_value = bit_value >> pow_2_std;
+   		cout << "normalized bits: "<< bit_value << endl;
+
+		// ### multiply with gamma ###
+
+		// equivalent with formula
+		//dest(i,j) = gamma*(target(i,j) - running_mean)*invstd 
+		unsigned int pow_2_gamma = 32 - __builtin_clz(gamma);
+		bit_value = bit_value << pow_2_gamma;
+   		cout << "scaled normalized bits: "<< bit_value << endl;
+
+		// ### add beta ###
+		 unsigned int scaled_value = (unsigned int)(bit_value.to_ulong());
+
+		dest(i,j) = scaled_value + beta;
+   		cout << "shifted and scaled normalized integers: "<< dest(i,j) << endl;
+		// equivalent with formula
                 //dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
