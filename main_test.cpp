@@ -81,6 +81,7 @@ void bitwise_batch_normalize_inference (
 		cout << "centered input bits: "<< bit_value << endl;
 		
 		// equivalent in formula: (target(i,j) - running_mean)*invstd
+		// probably some bug here how to treat the standard deviation!
 		bit_value = bit_value >> pow_2_std;
    		cout << "normalized bits: "<< bit_value << endl;
 
@@ -201,7 +202,7 @@ int main()
   batch_normalize_conv_inference ((int)eps,output,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
 
  //#### Test bitwise batch normalization (with scaling and shifting)####
-
-  // call bitwise batch norm with random shift and scale
-  bitwise_batch_normalize_inference ((unsigned int)eps,output,target,gamma_rnd, beta_rnd,(unsigned int)running_mean,(unsigned int)running_var);
+  
+  // call bitwise batch norm with no shift and scale
+  bitwise_batch_normalize_inference ((unsigned int)eps,output,target,(unsigned int)gamma, (unsigned int)beta,(unsigned int)running_mean,(unsigned int)running_var);
 }
