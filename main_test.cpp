@@ -2,10 +2,14 @@
 #include <Eigen/Dense>
 #include <random>
 #include <bitset>
+#include <cmath>
 // copy the Eigen folder to /usr/local/include/ or put symlink
 
 // run this program as
 // g++ main_test.cpp -std=c++11 -o test
+
+// TODO: extend for multiple channel inputs -> would need Tensor instead of Matrix object
+// but this can be ignored for the theoretical tests
 using namespace Eigen;
 using namespace std;
 
@@ -32,6 +36,31 @@ void batch_normalize_conv_inference (
   //cout << "destination matrix =" << endl << dest << endl;
 }
 
+// computes approximate square root
+unsigned int approximate_sqrt (
+	const unsigned int value
+)
+{
+  bitset<16> bit_value{value};
+  //cout << "bit value: "<< bit_value << endl;
+  // clz computes the number of running zeros regarding a 32-bit encoding
+  unsigned int pos_highest_bit = 32 - __builtin_clz(value);
+  //cout << "clz: "<< __builtin_clz(value) << endl;
+  //cout << "position of highest bit: "<< pos_highest_bit << endl;
+  // shift number of to the right by one bit (means dividing by 2)
+  bitset<16> highest_bit{pos_highest_bit};
+  highest_bit >>= 1;
+  //cout << "highest bit: "<< highest_bit << endl;
+  unsigned int sqrt_shift = (unsigned int)(highest_bit.to_ulong());
+  // shift variance
+  bitset<16> bit_sqrt;
+  bit_sqrt = bit_value >> sqrt_shift;
+    
+  unsigned int approximate_solution = (unsigned int)(bit_sqrt.to_ulong());
+  
+  return approximate_solution;
+}
+
 // the function is using int as type but it could be an 8-bit type as well 
 // int just worked better with the Eigen matrix type
 // TODO: maybe the datatype could be changed to the uint8_t type in the future
@@ -48,23 +77,8 @@ void bitwise_batch_normalize_inference (
   // ### compute square root ###
   // find leading bit of variance
   cout << "var: "<< running_variance << endl;
-  bitset<16> bit_var{running_variance};
-  cout << "bit var: "<< bit_var << endl;
-  // clz computes the number of running zeros regarding a 32-bit encoding
-  unsigned int pos_highest_bit = 32 - __builtin_clz(running_variance);
-  //cout << "clz: "<< __builtin_clz(running_variance) << endl;
-  //cout << "position of highest bit: "<< pos_highest_bit << endl;
-  // shift number of to the right by one bit (means dividing by 2)
-  bitset<16> highest_bit{pos_highest_bit};
-  highest_bit >>= 1;
-  //cout << "highest bit: "<< highest_bit << endl;
-  unsigned int sqrt_shift = (unsigned int)(highest_bit.to_ulong());
-  // shift variance
-  bitset<16> bit_std;
-  bit_std = bit_var >> sqrt_shift;
   
-    
-  unsigned int sqrt_approx = (unsigned int)(bit_std.to_ulong());
+  unsigned int sqrt_approx = approximate_sqrt(running_variance);
   cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
   // Adding 1 to the std - likely to have little effect on the result but prevents division by zero
   unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+1);
@@ -78,7 +92,6 @@ void bitwise_batch_normalize_inference (
 		int centered_value = target(i,j) - running_mean;
 		// negative numbers cause some trouble here
 		// TODO: fix this trouble
-
 
 		cout << "centered value: "<< target(i,j) - running_mean << endl;
 		// shift to the right to divide by the standard deviation with added const
@@ -132,9 +145,21 @@ ParamT get_variance_of_matrix (
 
 int main()
 {
-  // TODO: extend for multiple channel inputs -> would need Tensor instead of Matrix object
-  // but this can be ignored for the theoretical tests
+
+  //#### Test square root approximation ####
+  const int num_samples = 1000;
+  const int start_number = 0;
+  VectorXf approximation_errors = VectorXf::Zero(num_samples);
   
+  for (int i = 0; i < num_samples; i++)
+  	{
+	approximation_errors(i) = abs(sqrt(i+start_number) - approximate_sqrt(i+start_number));
+  	}
+  cout << "average approximation error: "<< approximation_errors.mean() << endl;
+  //MatrixXi::Index maxRow, maxCol;
+  //float max = m.maxCoeff(&maxRow, &maxCol);
+  cout << "maximum approximation error: "<< approximation_errors.maxCoeff() << endl;
+  cout << "minimum approximation error: "<< approximation_errors.minCoeff() << endl;
   //#### general parameters ####
 
   const int num_rows = 5;
@@ -143,11 +168,11 @@ int main()
 
 
   //#### init input and ouput matrices ####
-
+  
   // generate random input matrix of integers 
   // output of convolutional layer (assuming batch norm after conv and before activation)
   // convolution -> batch normalization -> activation -> quantization
-
+  
   MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
   float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 50;
   MatrixXi target = float_target.cast <int> ();
@@ -158,7 +183,7 @@ int main()
   MatrixXf float_output = MatrixXf::Zero(num_rows,num_cols);
 
   //#### Test float batch normalization (test normalization part) ####
-  
+  /*
   // set gamma to 1 for no scaling
   float gamma = 1;
   // set beta to 0 for no shifting
@@ -177,18 +202,18 @@ int main()
 
   // call standard (float) batch norm
   batch_normalize_conv_inference (eps,float_output,float_target,gamma, beta,running_mean,running_var);
-
+  /**/
 
 
   //#### Test int batch normalization (test normalization part) ####
 
   // call int batch norm
-  batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
+  //batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
 
 
 
   //#### Test int batch normalization (test scaling and shifting part)####
-  
+  /*
   mt19937 rng;
   rng.seed(random_device()());
   uniform_int_distribution<mt19937::result_type> dist8(1,8);
@@ -205,9 +230,12 @@ int main()
 
   // call int batch norm with random shift and scale
   batch_normalize_conv_inference ((int)eps,output,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
-
+  /**/
  //#### Test bitwise batch normalization (with scaling and shifting)####
   
   // call bitwise batch norm with no shift and scale
-  bitwise_batch_normalize_inference ((unsigned int)eps,output,target,(unsigned int)gamma, (unsigned int)beta,(unsigned int)running_mean,(unsigned int)running_var);
+  //bitwise_batch_normalize_inference ((unsigned int)eps,output,target,(unsigned int)gamma, (unsigned int)beta,(unsigned int)running_mean,(unsigned int)running_var);
+
+
+
 }
