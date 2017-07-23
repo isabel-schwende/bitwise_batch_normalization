@@ -76,6 +76,11 @@ void bitwise_batch_normalize_inference (
         	{
   		// ### center inputs by subtracting the mean ###
 		int centered_value = target(i,j) - running_mean;
+		// negative numbers cause some trouble here
+		// TODO: fix this trouble
+
+
+		cout << "centered value: "<< target(i,j) - running_mean << endl;
 		// shift to the right to divide by the standard deviation with added const
 		bitset<16> bit_value{centered_value};
 		cout << "centered input bits: "<< bit_value << endl;
@@ -91,7 +96,7 @@ void bitwise_batch_normalize_inference (
 		//dest(i,j) = gamma*(target(i,j) - running_mean)*invstd 
 		unsigned int pow_2_gamma = 32 - __builtin_clz(gamma);
 		bit_value = bit_value << pow_2_gamma;
-   		cout << "scaled normalized bits: "<< bit_value << endl;
+   		//cout << "scaled normalized bits: "<< bit_value << endl;
 
 		// ### add beta ###
 		 unsigned int scaled_value = (unsigned int)(bit_value.to_ulong());
