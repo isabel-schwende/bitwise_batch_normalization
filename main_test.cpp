@@ -150,16 +150,23 @@ int main()
   const int num_samples = 1000;
   const int start_number = 0;
   VectorXf approximation_errors = VectorXf::Zero(num_samples);
+  VectorXf approximation_errors_pow2 = VectorXf::Zero(num_samples);
   
   for (int i = 0; i < num_samples; i++)
   	{
 	approximation_errors(i) = abs(sqrt(i+start_number) - approximate_sqrt(i+start_number));
+  	approximation_errors_pow2(i) = abs(sqrt(i+start_number) - 32 + __builtin_clz(approximate_sqrt(i+start_number)+1));
   	}
   cout << "average approximation error: "<< approximation_errors.mean() << endl;
-  //MatrixXi::Index maxRow, maxCol;
-  //float max = m.maxCoeff(&maxRow, &maxCol);
   cout << "maximum approximation error: "<< approximation_errors.maxCoeff() << endl;
   cout << "minimum approximation error: "<< approximation_errors.minCoeff() << endl;
+
+  cout << "### Power of 2 approximation of approximated sqrt compared to float version ###" << endl;
+  cout << "average approximation error: "<< approximation_errors_pow2.mean() << endl;
+  cout << "maximum approximation error: "<< approximation_errors_pow2.maxCoeff() << endl;
+  cout << "minimum approximation error: "<< approximation_errors_pow2.minCoeff() << endl;
+
+
   //#### general parameters ####
 
   const int num_rows = 5;
