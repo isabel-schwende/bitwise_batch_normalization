@@ -33,7 +33,7 @@ void batch_normalize_conv_inference (
                 dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
-  //cout << "destination matrix =" << endl << dest << endl;
+  cout << "Standard BN result matrix =" << endl << dest << endl;
 }
 
 // computes approximate square root
@@ -61,9 +61,8 @@ unsigned int approximate_sqrt (
   return approximate_solution;
 }
 
-// the function is using int as type but it could be an 8-bit type as well 
+// the function is using 16bit int as type but it could be an 8-bit type as well 
 // int just worked better with the Eigen matrix type
-// TODO: maybe the datatype could be changed to the uint8_t type in the future
 void bitwise_batch_normalize_inference (
 	const unsigned int eps,
         MatrixXi& dest,
@@ -76,51 +75,57 @@ void bitwise_batch_normalize_inference (
 {
   // ### compute square root ###
   // find leading bit of variance
-  cout << "var: "<< running_variance << endl;
+  //cout << "variance: "<< running_variance << endl;
   
   unsigned int sqrt_approx = approximate_sqrt(running_variance);
-  cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
+  //cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
   // Adding 1 to the std - likely to have little effect on the result but prevents division by zero
-  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+1);
-  cout << "power of 2 standard deviation: "<< pow_2_std << endl;  
+  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+1)-1;
+  //cout << "power of 2 standard deviation: "<< pow_2_std << endl;  
 
   for (int i = 0; i < target.rows(); i++)
   	{
   	for (int j = 0; j < target.cols(); j++)
         	{
   		// ### center inputs by subtracting the mean ###
-		int centered_value = target(i,j) - running_mean;
-		// negative numbers cause some trouble here
-		// TODO: fix this trouble
+		int centered_value = target(i,j) - (int) running_mean;
+		// negative numbers caused some trouble here
+		// Ugly fix: use absolute values for scaling return sign information later
 
-		cout << "centered value: "<< target(i,j) - running_mean << endl;
-		// shift to the right to divide by the standard deviation with added const
-		bitset<16> bit_value{centered_value};
-		cout << "centered input bits: "<< bit_value << endl;
+		//cout << "centered value: "<< centered_value << endl;
+		// Convert to bitstring, there is no sign bit so bit shifting is on absolute values
+		bitset<16> bit_value{abs(centered_value)};
+		//cout << "centered input bits: "<< bit_value << endl;
 		
+		// shift to the right to divide by the standard deviation with added const
 		// equivalent in formula: (target(i,j) - running_mean)*invstd
 		// probably some bug here how to treat the standard deviation!
 		bit_value = bit_value >> pow_2_std;
-   		cout << "normalized bits: "<< bit_value << endl;
+   		//cout << "normalized bits: "<< bit_value << endl;
 
 		// ### multiply with gamma ###
 
 		// equivalent with formula
 		//dest(i,j) = gamma*(target(i,j) - running_mean)*invstd 
-		unsigned int pow_2_gamma = 32 - __builtin_clz(gamma);
+		// substract one to account for shift of values 
+		// example 2^0 = 1 shifting by 0 is the same as multiply by 1
+		// 2^1 = 2 shifting by 1 is the same as multiply by 2
+		unsigned int pow_2_gamma = 32 - __builtin_clz(gamma) -1;
 		bit_value = bit_value << pow_2_gamma;
    		//cout << "scaled normalized bits: "<< bit_value << endl;
 
 		// ### add beta ###
-		 unsigned int scaled_value = (unsigned int)(bit_value.to_ulong());
+		unsigned int abs_scaled_value = (unsigned int)(bit_value.to_ulong());
+		int scaled_value = (int) abs_scaled_value;
+		if (centered_value<0){scaled_value = - scaled_value;}
 
 		dest(i,j) = scaled_value + beta;
-   		cout << "shifted and scaled normalized integers: "<< dest(i,j) << endl;
+   		//cout << "shifted and scaled normalized integers: "<< dest(i,j) << endl;
 		// equivalent with formula
                 //dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
-  //cout << "destination matrix =" << endl << dest << endl;
+  cout << "Bitshift BN result matrix =" << endl << dest << endl;
 }
 
 template<typename ParamT,typename Derived>
@@ -147,6 +152,7 @@ int main()
 {
 
   //#### Test square root approximation ####
+  /*
   const int num_samples = 1000;
   const int start_number = 0;
   VectorXf approximation_errors = VectorXf::Zero(num_samples);
@@ -165,7 +171,7 @@ int main()
   cout << "average approximation error: "<< approximation_errors_pow2.mean() << endl;
   cout << "maximum approximation error: "<< approximation_errors_pow2.maxCoeff() << endl;
   cout << "minimum approximation error: "<< approximation_errors_pow2.minCoeff() << endl;
-
+  /**/
 
   //#### general parameters ####
 
@@ -181,7 +187,7 @@ int main()
   // convolution -> batch normalization -> activation -> quantization
   
   MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
-  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 50;
+  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,100.0)) * 50;
   MatrixXi target = float_target.cast <int> ();
   cout << "target matrix =" << endl << target << endl;
 
@@ -190,7 +196,7 @@ int main()
   MatrixXf float_output = MatrixXf::Zero(num_rows,num_cols);
 
   //#### Test float batch normalization (test normalization part) ####
-  /*
+  
   // set gamma to 1 for no scaling
   float gamma = 1;
   // set beta to 0 for no shifting
@@ -208,14 +214,14 @@ int main()
   const float eps = 0;
 
   // call standard (float) batch norm
-  batch_normalize_conv_inference (eps,float_output,float_target,gamma, beta,running_mean,running_var);
+  //batch_normalize_conv_inference (eps,float_output,float_target,gamma, beta,running_mean,running_var);
   /**/
 
 
   //#### Test int batch normalization (test normalization part) ####
 
   // call int batch norm
-  //batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
+  batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
 
 
 
@@ -233,7 +239,7 @@ int main()
   unsigned int beta_rnd =  dist_beta(rng);
   cout << "gamma =" << endl << gamma_rnd << endl;
   cout << "beta =" << endl << beta_rnd << endl;
-
+  
 
   // call int batch norm with random shift and scale
   batch_normalize_conv_inference ((int)eps,output,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
@@ -241,7 +247,7 @@ int main()
  //#### Test bitwise batch normalization (with scaling and shifting)####
   
   // call bitwise batch norm with no shift and scale
-  //bitwise_batch_normalize_inference ((unsigned int)eps,output,target,(unsigned int)gamma, (unsigned int)beta,(unsigned int)running_mean,(unsigned int)running_var);
+  bitwise_batch_normalize_inference ((unsigned int)eps,output,target,(unsigned int)gamma, (unsigned int)beta,(unsigned int)running_mean,(unsigned int)running_var);
 
 
 
