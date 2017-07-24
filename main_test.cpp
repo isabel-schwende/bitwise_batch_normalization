@@ -13,13 +13,13 @@
 using namespace Eigen;
 using namespace std;
 
-template<typename ParamT,typename ParamU,typename Derived>
+template<typename ParamT,typename Derived>
 void batch_normalize_conv_inference (
 	const ParamT eps,
         MatrixBase<Derived>& dest,
         const MatrixBase<Derived>& target,
-        const ParamU gamma, 
-        const ParamU beta,
+        const ParamT gamma, 
+        const ParamT beta,
         const ParamT running_mean,
         const ParamT running_variance
 )
@@ -30,7 +30,7 @@ void batch_normalize_conv_inference (
   	{
   	for (int j = 0; j < target.cols(); j++)
         	{
-                dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
+                dest(i,j) = gamma* (ParamT)( (target(i,j) - running_mean)*invstd) + beta;
                 }
 	}
   cout << "Standard BN result matrix =" << endl << dest << endl;
@@ -187,7 +187,7 @@ int main()
   // convolution -> batch normalization -> activation -> quantization
   
   MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
-  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,100.0)) * 50;
+  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 60;
   MatrixXi target = float_target.cast <int> ();
   cout << "target matrix =" << endl << target << endl;
 
@@ -204,11 +204,11 @@ int main()
 
   // init running mean as sample mean 
   float running_mean = target.mean();
-  cout << "running mean =" << endl << running_mean << endl;
+  cout << "sample mean =" << endl << running_mean << endl;
 
   // init variance as sample variance
   float running_var = get_variance_of_matrix (target,running_mean);
-  cout << "running variance =" << endl << running_var << endl;
+  cout << "sample variance =" << endl << running_var << endl;
 
   // constant epsilon as zero to prevent addition of noise - division by zero might happen
   const float eps = 0;
@@ -221,25 +221,27 @@ int main()
   //#### Test int batch normalization (test normalization part) ####
 
   // call int batch norm
-  batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
+  //batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
 
 
 
   //#### Test int batch normalization (test scaling and shifting part)####
-  /*
+  
   mt19937 rng;
   rng.seed(random_device()());
-  uniform_int_distribution<mt19937::result_type> dist8(1,8);
-  uniform_int_distribution<mt19937::result_type> dist_beta(1,128);
+  uniform_int_distribution<mt19937::result_type> dist8(1,118);
+  uniform_int_distribution<mt19937::result_type> dist_beta(1,118);
 
-  // gamma has to be a power of 2 
-  // in this case we'll just generate the power of two as an integer without computing it yet
-  unsigned int gamma_rnd = dist8(rng);
+  // gamma could be any value but is later reduced to a power of 2 
+  int gamma_rnd = dist8(rng);
   // can be any integer
-  unsigned int beta_rnd =  dist_beta(rng);
+  int beta_rnd =  dist_beta(rng);
   cout << "gamma =" << endl << gamma_rnd << endl;
   cout << "beta =" << endl << beta_rnd << endl;
   
+  // call int batch norm with random shift and scale
+  batch_normalize_conv_inference (eps,output,target,(float)gamma_rnd, (float)beta_rnd,running_mean,running_var);
+  /**/
 
   // call int batch norm with random shift and scale
   batch_normalize_conv_inference ((int)eps,output,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
@@ -247,7 +249,7 @@ int main()
  //#### Test bitwise batch normalization (with scaling and shifting)####
   
   // call bitwise batch norm with no shift and scale
-  bitwise_batch_normalize_inference ((unsigned int)eps,output,target,(unsigned int)gamma, (unsigned int)beta,(unsigned int)running_mean,(unsigned int)running_var);
+  bitwise_batch_normalize_inference ((int)eps,output,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
 
 
 
