@@ -80,7 +80,7 @@ void bitwise_batch_normalize_inference (
   unsigned int sqrt_approx = approximate_sqrt(running_variance);
   //cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
   // Adding 1 to the std - likely to have little effect on the result but prevents division by zero
-  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+1)-1;
+  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+eps)-1;
   //cout << "power of 2 standard deviation: "<< pow_2_std << endl;  
 
   for (int i = 0; i < target.rows(); i++)
@@ -187,7 +187,7 @@ int main()
   // convolution -> batch normalization -> activation -> quantization
   
   MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
-  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 60;
+  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 10;
   MatrixXi target = float_target.cast <int> ();
   cout << "target matrix =" << endl << target << endl;
 
@@ -211,7 +211,7 @@ int main()
   cout << "sample variance =" << endl << running_var << endl;
 
   // constant epsilon as zero to prevent addition of noise - division by zero might happen
-  const float eps = 0;
+  const float eps = 1;
 
   // call standard (float) batch norm
   //batch_normalize_conv_inference (eps,float_output,float_target,gamma, beta,running_mean,running_var);
@@ -239,7 +239,7 @@ int main()
   cout << "gamma =" << endl << gamma_rnd << endl;
   cout << "beta =" << endl << beta_rnd << endl;
   
-  // call int batch norm with random shift and scale
+  // call float batch norm with random shift and scale
   batch_normalize_conv_inference (eps,output,target,(float)gamma_rnd, (float)beta_rnd,running_mean,running_var);
   /**/
 
