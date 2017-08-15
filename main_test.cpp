@@ -147,6 +147,17 @@ ParamT get_variance_of_matrix (
   return var;
 }
 
+// error metric function
+// summation of elementwise euclidean distance as error function
+void error_matrices (
+	MatrixXi& dest,
+        const MatrixXi& mat_a,
+        const MatrixXi& mat_b
+)
+{
+
+
+}
 
 int main()
 {
