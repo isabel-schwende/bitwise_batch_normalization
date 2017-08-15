@@ -74,13 +74,13 @@ void bitwise_batch_normalize_inference (
 )
 {
   // ### compute square root ###
-  // find leading bit of variance
+  // get approximation of standard deviation from variance by approximate square root operation
   //cout << "variance: "<< running_variance << endl;
-  
-  unsigned int sqrt_approx = approximate_sqrt(running_variance);
+  unsigned int sqrt_approx = approximate_sqrt(running_variance+eps);
   //cout << "approximated standard deviation: "<< sqrt_approx << " exact: "<< sqrt(running_variance) << endl;
-  // Adding 1 to the std - likely to have little effect on the result but prevents division by zero
-  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx+eps)-1;
+
+  // Adding epsilon to the std - likely to have little effect on the result but prevents division by zero
+  unsigned int pow_2_std = 32 - __builtin_clz(sqrt_approx)-1;
   //cout << "power of 2 standard deviation: "<< pow_2_std << endl;  
 
   for (int i = 0; i < target.rows(); i++)
@@ -229,8 +229,8 @@ int main()
   
   mt19937 rng;
   rng.seed(random_device()());
-  uniform_int_distribution<mt19937::result_type> dist8(1,118);
-  uniform_int_distribution<mt19937::result_type> dist_beta(1,118);
+  uniform_int_distribution<mt19937::result_type> dist8(1,10);
+  uniform_int_distribution<mt19937::result_type> dist_beta(1,19);
 
   // gamma could be any value but is later reduced to a power of 2 
   int gamma_rnd = dist8(rng);
@@ -250,7 +250,13 @@ int main()
   
   // call bitwise batch norm with no shift and scale
   bitwise_batch_normalize_inference ((int)eps,output,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
-
+ 
+ // test what happens if variance is zero
+ // eps seems to be working - no error thrown
+ /*
+  running_var = 0;
+  bitwise_batch_normalize_inference ((int)eps,output,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
+  /**/
 
 
 }
