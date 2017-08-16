@@ -33,7 +33,7 @@ void batch_normalize_conv_inference (
                 dest(i,j) = (float)gamma* (ParamT)( (target(i,j) - running_mean)*invstd) + beta;
                 }
 	}
-  cout << "Standard BN result matrix =" << endl << dest << endl;
+  //cout << "Standard BN result matrix =" << endl << dest << endl;
 }
 
 // computes approximate square root
@@ -125,7 +125,7 @@ void bitwise_batch_normalize_inference (
                 //dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
-  cout << "Bitshift BN result matrix =" << endl << dest << endl;
+  //cout << "Bitshift BN result matrix =" << endl << dest << endl;
 }
 
 template<typename ParamT,typename Derived>
@@ -163,7 +163,8 @@ float error_of_matrix(
   	{
   	for (int j = 0; j < target_a.cols(); j++)
         	{
-                sum_error = sum_error + (float)2*fabs(target_a(i,j)-target_b(i,j))/(target_a(i,j)+target_b(i,j));
+                //sum_error = sum_error + (float)2*abs(target_a(i,j)-target_b(i,j))/(target_a(i,j)+target_b(i,j));
+ 		sum_error = sum_error + (float)abs(target_a(i,j)-target_b(i,j));
                 }
 	}
   return sum_error;
@@ -224,6 +225,7 @@ int main()
   VectorXf errors_int_float = VectorXf::Zero(num_experiments);
   VectorXf errors_int_bit = VectorXf::Zero(num_experiments);
   VectorXf errors_bit_float = VectorXf::Zero(num_experiments);
+  const float range_values = 27;
   
   for (int i = 0; i < num_experiments; i++)
   	{
@@ -233,9 +235,9 @@ int main()
   	// convolution -> batch normalization -> activation -> quantization
   
 	MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
-	float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 10;
+	float_target = float_target * range_values;
 	MatrixXi target = float_target.cast <int> ();
-	cout << "target matrix =" << endl << target << endl;
+	//cout << "target matrix =" << endl << target << endl;
 
   	// init running mean as sample mean 
   	float running_mean = target.mean();
@@ -265,8 +267,8 @@ int main()
   	int gamma_rnd = dist8(rng);
   	// can be any integer
   	int beta_rnd =  dist_beta(rng);
-  	cout << "gamma =" << endl << gamma_rnd << endl;
-  	cout << "beta =" << endl << beta_rnd << endl;
+  	//cout << "gamma =" << endl << gamma_rnd << endl;
+  	//cout << "beta =" << endl << beta_rnd << endl;
   
   	// call float batch norm with random shift and scale
   	batch_normalize_conv_inference (eps,output_float,target,(float)gamma_rnd, (float)beta_rnd,running_mean,running_var);
@@ -275,7 +277,7 @@ int main()
   	// call int batch norm with random shift and scale
   	batch_normalize_conv_inference ((int)eps,output_standard,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
   	errors_int_float[i] = error_of_matrix(output_standard,output_float);
-  	cout << "error standard int to float =" << endl << errors_int_float[i] << endl;
+  	
   	/**/
  	//#### Test bitwise batch normalization (with scaling and shifting)####
   
@@ -283,12 +285,14 @@ int main()
 
   	bitwise_batch_normalize_inference ((int)eps,output_bitwise,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
 	errors_int_bit[i] = error_of_matrix(output_bitwise, output_standard);
-  	cout << "error standard int to bitwise =" << endl << errors_int_bit[i] << endl;
+  	
 	errors_bit_float[i] = error_of_matrix(output_float, output_bitwise);
-  	cout << "error standard bitwise to float =" << endl << errors_bit_float[i] << endl;
+  	
  
  }
- 
+ cout << "error int to float =" << endl << errors_int_float << endl;
+ cout << "error int to bitwise =" << endl << errors_int_bit << endl;
+ cout << "error bitwise to float =" << endl << errors_bit_float << endl;
  // test what happens if variance is zero
  // eps seems to be working - no error thrown
  /*
