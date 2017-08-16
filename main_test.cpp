@@ -199,85 +199,95 @@ int main()
   const int num_rows = 5;
   const int num_cols = 5;
 
-
-
-  //#### init input and ouput matrices ####
-  
-  // generate random input matrix of integers 
-  // output of convolutional layer (assuming batch norm after conv and before activation)
-  // convolution -> batch normalization -> activation -> quantization
-  
-  MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
-  float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 10;
-  MatrixXi target = float_target.cast <int> ();
-  cout << "target matrix =" << endl << target << endl;
-
-  // init output matrix
-  MatrixXf output_standard = MatrixXf::Zero(num_rows,num_cols);
-  MatrixXf output_bitwise = MatrixXf::Zero(num_rows,num_cols);
-  MatrixXf output_float = MatrixXf::Zero(num_rows,num_cols);
-
-  //#### Test float batch normalization (test normalization part) ####
-  
-  // set gamma to 1 for no scaling
-  float gamma = 1;
-  // set beta to 0 for no shifting
-  float beta =  0;
-
-  // init running mean as sample mean 
-  float running_mean = target.mean();
-  cout << "sample mean =" << endl << running_mean << endl;
-
-  // init variance as sample variance
-  float running_var = get_variance_of_matrix (target,running_mean);
-  cout << "sample variance =" << endl << running_var << endl;
-
-  // constant epsilon as zero to prevent addition of noise - division by zero might happen
-  const float eps = 1;
-
-  // call standard (float) batch norm
-  //batch_normalize_conv_inference (eps,float_output,float_target,gamma, beta,running_mean,running_var);
-  /**/
-
-
-  //#### Test int batch normalization (test normalization part) ####
-
-  // call int batch norm
-  //batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
-
-
-
-  //#### Test int batch normalization (test scaling and shifting part)####
-  
   mt19937 rng;
   rng.seed(random_device()());
   uniform_int_distribution<mt19937::result_type> dist8(1,100);
   uniform_int_distribution<mt19937::result_type> dist_beta(1,100);
 
-  // gamma could be any value but is later reduced to a power of 2 
-  int gamma_rnd = dist8(rng);
-  // can be any integer
-  int beta_rnd =  dist_beta(rng);
-  cout << "gamma =" << endl << gamma_rnd << endl;
-  cout << "beta =" << endl << beta_rnd << endl;
+  // constant epsilon 
+  // can be set to zero to prevent addition of noise but then division by zero might happen
+  const float eps = 1;
+
+  //#### init input and ouput matrices ####
+
+  // init output matrix
+  MatrixXf output_standard = MatrixXf::Zero(num_rows,num_cols);
+  MatrixXf output_bitwise = MatrixXf::Zero(num_rows,num_cols);
+  MatrixXf output_float = MatrixXf::Zero(num_rows,num_cols);
   
-  // call float batch norm with random shift and scale
-  batch_normalize_conv_inference (eps,output_float,target,(float)gamma_rnd, (float)beta_rnd,running_mean,running_var);
-
-  /**/
-
-  // call int batch norm with random shift and scale
-  batch_normalize_conv_inference ((int)eps,output_standard,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
-  int error_matrices = error_of_matrix(output_standard,output_float);
-  cout << "error standard int to float =" << endl << error_matrices << endl;
-  /**/
- //#### Test bitwise batch normalization (with scaling and shifting)####
+  // set gamma to 1 for no scaling
+  float gamma = 1;
+  // set beta to 0 for no shifting
+  float beta =  0;
   
-  // call bitwise batch norm with no shift and scale
+  const int num_experiments = 10;
+  VectorXf errors_int_float = VectorXf::Zero(num_experiments);
+  VectorXf errors_int_bit = VectorXf::Zero(num_experiments);
+  VectorXf errors_bit_float = VectorXf::Zero(num_experiments);
+  
+  for (int i = 0; i < num_experiments; i++)
+  	{
 
-  bitwise_batch_normalize_inference ((int)eps,output_bitwise,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
-  cout << "error standard int to bitwise =" << endl << error_of_matrix(output_bitwise, output_standard) << endl;
-  cout << "error standard bitwise to float =" << endl << error_of_matrix(output_float, output_bitwise) << endl;
+  	// generate random input matrix of integers 
+  	// output of convolutional layer (assuming batch norm after conv and before activation)
+  	// convolution -> batch normalization -> activation -> quantization
+  
+	MatrixXf float_target = MatrixXf::Random(num_rows,num_cols);
+	float_target = (float_target + MatrixXf::Constant(num_rows,num_cols,1.0)) * 10;
+	MatrixXi target = float_target.cast <int> ();
+	cout << "target matrix =" << endl << target << endl;
+
+  	// init running mean as sample mean 
+  	float running_mean = target.mean();
+  	//cout << "sample mean =" << endl << running_mean << endl;
+
+  	// init variance as sample variance
+  	float running_var = get_variance_of_matrix (target,running_mean);
+  	//cout << "sample variance =" << endl << running_var << endl;
+
+ 
+  	//#### Test float batch normalization (test normalization part) ####
+  	// call standard (float) batch norm
+  	//batch_normalize_conv_inference (eps,float_output,float_target,gamma, beta,running_mean,running_var);
+  	/**/
+
+
+  	//#### Test int batch normalization (test normalization part) ####
+
+  	// call int batch norm
+  	//batch_normalize_conv_inference ((int)eps,output,target,(int)gamma, (int)beta,(int)running_mean,(int)running_var);
+
+
+
+  	//#### Test int batch normalization (test scaling and shifting part)####
+
+  	// gamma could be any value but is later reduced to a power of 2 
+  	int gamma_rnd = dist8(rng);
+  	// can be any integer
+  	int beta_rnd =  dist_beta(rng);
+  	cout << "gamma =" << endl << gamma_rnd << endl;
+  	cout << "beta =" << endl << beta_rnd << endl;
+  
+  	// call float batch norm with random shift and scale
+  	batch_normalize_conv_inference (eps,output_float,target,(float)gamma_rnd, (float)beta_rnd,running_mean,running_var);
+  	/**/
+
+  	// call int batch norm with random shift and scale
+  	batch_normalize_conv_inference ((int)eps,output_standard,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
+  	errors_int_float[i] = error_of_matrix(output_standard,output_float);
+  	cout << "error standard int to float =" << endl << errors_int_float[i] << endl;
+  	/**/
+ 	//#### Test bitwise batch normalization (with scaling and shifting)####
+  
+  	// call bitwise batch norm with no shift and scale
+
+  	bitwise_batch_normalize_inference ((int)eps,output_bitwise,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
+	errors_int_bit[i] = error_of_matrix(output_bitwise, output_standard);
+  	cout << "error standard int to bitwise =" << endl << errors_int_bit[i] << endl;
+	errors_bit_float[i] = error_of_matrix(output_float, output_bitwise);
+  	cout << "error standard bitwise to float =" << endl << errors_bit_float[i] << endl;
+ 
+ }
  
  // test what happens if variance is zero
  // eps seems to be working - no error thrown
@@ -285,6 +295,4 @@ int main()
   running_var = 0;
   bitwise_batch_normalize_inference ((int)eps,output,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
   /**/
-
-
 }
