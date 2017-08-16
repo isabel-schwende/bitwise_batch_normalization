@@ -16,7 +16,7 @@ using namespace std;
 template<typename ParamT,typename Derived>
 void batch_normalize_conv_inference (
 	const ParamT eps,
-        MatrixBase<Derived>& dest,
+        MatrixXf& dest,
         const MatrixBase<Derived>& target,
         const ParamT gamma, 
         const ParamT beta,
@@ -30,10 +30,10 @@ void batch_normalize_conv_inference (
   	{
   	for (int j = 0; j < target.cols(); j++)
         	{
-                dest(i,j) = gamma* (ParamT)( (target(i,j) - running_mean)*invstd) + beta;
+                dest(i,j) = (float)gamma* (ParamT)( (target(i,j) - running_mean)*invstd) + beta;
                 }
 	}
-  //cout << "Standard BN result matrix =" << endl << dest << endl;
+  cout << "Standard BN result matrix =" << endl << dest << endl;
 }
 
 // computes approximate square root
@@ -65,7 +65,7 @@ unsigned int approximate_sqrt (
 // int just worked better with the Eigen matrix type
 void bitwise_batch_normalize_inference (
 	const unsigned int eps,
-        MatrixXi& dest,
+        MatrixXf& dest,
         const MatrixXi& target,
         const unsigned int gamma, 
         const unsigned int beta,
@@ -119,13 +119,13 @@ void bitwise_batch_normalize_inference (
 		int scaled_value = (int) abs_scaled_value;
 		if (centered_value<0){scaled_value = - scaled_value;}
 
-		dest(i,j) = scaled_value + beta;
+		dest(i,j) = (float)scaled_value + beta;
    		//cout << "shifted and scaled normalized integers: "<< dest(i,j) << endl;
 		// equivalent with formula
                 //dest(i,j) = gamma*(target(i,j) - running_mean)*invstd + beta;
                 }
 	}
-  //cout << "Bitshift BN result matrix =" << endl << dest << endl;
+  cout << "Bitshift BN result matrix =" << endl << dest << endl;
 }
 
 template<typename ParamT,typename Derived>
@@ -148,15 +148,25 @@ ParamT get_variance_of_matrix (
 }
 
 // error metric function
-// summation of elementwise euclidean distance as error function
-template<typename Derived>
-int error_matrices (
-        const MatrixBase<Derived>& mat_a,
-        const MatrixBase<Derived>& mat_b
+// as suggested by Nicolas
+// summation of elementwise euclidean distance divided by the mid point aka (a+b)/2
+
+template<typename Derived_a,typename Derived_b>
+float error_of_matrix(
+	const MatrixBase<Derived_a>& target_a,
+        const MatrixBase<Derived_b>& target_b
 )
 {
-  int error_value = (int)(mat_a - mat_b).cwiseAbs().sum();
-  return error_value;
+  //TODO: Add error handling for size of matrix - error might occur if b is smaller than a
+  float sum_error = 0;
+  for (int i = 0; i < target_a.rows(); i++)
+  	{
+  	for (int j = 0; j < target_a.cols(); j++)
+        	{
+                sum_error = sum_error + (float)2*fabs(target_a(i,j)-target_b(i,j))/(target_a(i,j)+target_b(i,j));
+                }
+	}
+  return sum_error;
 }
 
 int main()
@@ -203,9 +213,9 @@ int main()
   cout << "target matrix =" << endl << target << endl;
 
   // init output matrix
-  MatrixXi output_standard = MatrixXi::Zero(num_rows,num_cols);
-  MatrixXi output_bitwise = MatrixXi::Zero(num_rows,num_cols);
-  MatrixXi output_float = MatrixXi::Zero(num_rows,num_cols);
+  MatrixXf output_standard = MatrixXf::Zero(num_rows,num_cols);
+  MatrixXf output_bitwise = MatrixXf::Zero(num_rows,num_cols);
+  MatrixXf output_float = MatrixXf::Zero(num_rows,num_cols);
 
   //#### Test float batch normalization (test normalization part) ####
   
@@ -258,14 +268,16 @@ int main()
 
   // call int batch norm with random shift and scale
   batch_normalize_conv_inference ((int)eps,output_standard,target,gamma_rnd, beta_rnd,(int)running_mean,(int)running_var);
-  cout << "error standard int to float =" << endl << error_matrices (output_float, output_standard) << endl;
+  int error_matrices = error_of_matrix(output_standard,output_float);
+  cout << "error standard int to float =" << endl << error_matrices << endl;
   /**/
  //#### Test bitwise batch normalization (with scaling and shifting)####
   
   // call bitwise batch norm with no shift and scale
+
   bitwise_batch_normalize_inference ((int)eps,output_bitwise,target,(int)gamma_rnd, (int)beta_rnd,(int)running_mean,(int)running_var);
-  cout << "error standard int to bitwise =" << endl << error_matrices (output_bitwise, output_standard) << endl;
-  cout << "error standard bitwise to float =" << endl << error_matrices (output_float, output_bitwise) << endl;
+  cout << "error standard int to bitwise =" << endl << error_of_matrix(output_bitwise, output_standard) << endl;
+  cout << "error standard bitwise to float =" << endl << error_of_matrix(output_float, output_bitwise) << endl;
  
  // test what happens if variance is zero
  // eps seems to be working - no error thrown
